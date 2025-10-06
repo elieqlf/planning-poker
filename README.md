@@ -1,5 +1,5 @@
 # planning-poker
 Projet - Conception Agile
 
-LORENZO Quentin \n
+LORENZO Quentin
 CALVIERE Elie
