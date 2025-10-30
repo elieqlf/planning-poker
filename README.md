@@ -31,7 +31,7 @@ source .venv/bin/activate
 ## Installation des dépendances
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r server/requirements.txt
 ```
 
 ---
@@ -39,7 +39,7 @@ python -m pip install -r requirements.txt
 ## Lancement de l’application
 
 ```bash
-python app.py
+python server/app.py
 ```
 
 ---
