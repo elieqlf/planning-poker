@@ -25,7 +25,8 @@ def create_room():
 
     rooms[room_id] = {
         'name': name,
-        'players': []
+        'players': [],
+        'stories': {}
     }
 
     return jsonify({
