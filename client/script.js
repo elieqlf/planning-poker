@@ -6,8 +6,12 @@ document.getElementById('pseudoForm').addEventListener('submit', function(e) {
     
     if (pseudo) {
         console.log('Pseudo saisi :', pseudo);
-        // Pour le moment, on affiche juste une alerte
-        alert(`Bienvenue ${pseudo} ! (Backend non connecté pour le moment)`);
+        
+        // Sauvegarder le pseudo dans localStorage
+        localStorage.setItem('playerName', pseudo);
+        
+        // Rediriger vers la page de choix de salle
+        window.location.href = 'room-choice.html';
         
         // Ici, plus tard, on pourra faire appel au backend
         // fetch('http://127.0.0.1:5000/rooms/<room_id>/players', { ... })
