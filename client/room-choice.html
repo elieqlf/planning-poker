@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning Poker - Choix de Salle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Planning Poker</h1>
+            <p class="subtitle" id="welcomeMessage">Bienvenue ! Choisissez une option</p>
+            
+            <div class="room-options">
+                <!-- Option 1: Créer une salle -->
+                <div class="option-card">
+                    <div>
+                        <h2>Créer une salle</h2>
+                        <p>Démarrez une nouvelle session de planning poker</p>
+                    </div>
+                    <form id="createForm">
+                        <div class="form-group">
+                            <input 
+                                type="text" 
+                                id="roomName" 
+                                name="roomName" 
+                                placeholder="Nom de la salle" 
+                                required
+                                maxlength="50"
+                            >
+                        </div>
+                        <button type="submit" class="btn-option">
+                            Créer
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Option 2: Rejoindre une salle -->
+                <div class="option-card">
+                    <div>
+                        <h2>Rejoindre une salle</h2>
+                        <p>Entrez le code d'une salle existante</p>
+                    </div>
+                    <form id="joinForm">
+                        <div class="form-group">
+                            <input 
+                                type="text" 
+                                id="roomCode" 
+                                name="roomCode" 
+                                placeholder="Code (6 caractères)" 
+                                required
+                                maxlength="6"
+                                style="text-transform: uppercase;"
+                            >
+                        </div>
+                        <button type="submit" class="btn-option">
+                            Rejoindre
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="room-choice.js"></script>
+</body>
+</html>
