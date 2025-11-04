@@ -1,6 +1,12 @@
 from flask import request, jsonify
+import jwt
+import os
+from dotenv import load_dotenv
 from . import players_bp
-from utils.storage import rooms
+from utils.storage import rooms, players
+
+load_dotenv()
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 @players_bp.route('/rooms/<room_id>/players', methods=['POST'])
 def join_room(room_id):
@@ -66,3 +72,34 @@ def kick_player(room_id, player_id):
     # return la nouvelle liste avec le joueur retirer
     return jsonify(rooms[room_id]['players'])
 
+@players_bp.route('/players/create', methods=['POST'])
+def create_player():
+    data = request.get_json()
+
+    if 'name' not in data:
+        return jsonify({
+            'error': 'Il faut un nom pour s\'identifier'
+        }), 404
+
+    name = data.get('name')
+    id = len(players)
+
+    players[id] = name
+
+    # Token bearer
+    payload = {'id': id}
+
+    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+
+    return jsonify({
+        'token': token
+    }), 201
+
+def valid_token(token):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return 'Token Expired'
+    except jwt.InvalidTokenError:
+        return 'Invalid Token'
