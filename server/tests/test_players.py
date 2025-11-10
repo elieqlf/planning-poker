@@ -115,12 +115,52 @@ class TestKickPlayer:
     
     def test_kick_player_success(self, client, sample_room):
         """Test: expulser un joueur d'une room"""
-        pass
+        # Ajouter des joueurs à la room
+        rooms[sample_room]['players'].append({
+            'player_id': '1',
+            'player_name': 'Alice'
+        })
+        rooms[sample_room]['players'].append({
+            'player_id': '2',
+            'player_name': 'Bob'
+        })
+        
+        # Expulser le joueur avec l'ID '1'
+        response = client.delete(f'/rooms/{sample_room}/players/1')
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        # Vérifier que seul Bob reste
+        assert data[0]['player_id'] == '2'
+        assert data[0]['player_name'] == 'Bob'
+        
+        # Vérifier dans le storage
+        assert len(rooms[sample_room]['players']) == 1
+        assert rooms[sample_room]['players'][0]['player_name'] == 'Bob'
     
     def test_kick_player_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.delete('/rooms/NONEXISTENT/players/1')
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == 'La room n\'existe pas'
     
     def test_kick_player_nonexistent_player(self, client, sample_room):
         """Test: erreur si le joueur n'existe pas"""
-        pass
+        # Ajouter un joueur à la room
+        rooms[sample_room]['players'].append({
+            'player_id': '1',
+            'player_name': 'Alice'
+        })
+        
+        # Essayer d'expulser un joueur inexistant
+        response = client.delete(f'/rooms/{sample_room}/players/999')
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert 'n\'existe pas' in data['error']
