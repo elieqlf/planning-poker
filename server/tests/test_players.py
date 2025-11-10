@@ -37,15 +37,43 @@ class TestJoinRoom:
     
     def test_join_room_success(self, client, sample_room):
         """Test: un joueur peut rejoindre une room existante"""
-        pass
+        response = client.post(
+            f'/rooms/{sample_room}/players',
+            json={'name': 'Alice'}
+        )
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert 'player_id' in data
+        assert data['player_id'] == '1'
+        
+        # Vérifier que le joueur a bien été ajouté à la room
+        assert len(rooms[sample_room]['players']) == 1
+        assert rooms[sample_room]['players'][0]['player_name'] == 'Alice'
     
     def test_join_room_nonexistent(self, client):
         """Test: impossible de rejoindre une room qui n'existe pas"""
-        pass
+        response = client.post(
+            '/rooms/NONEXISTENT/players',
+            json={'name': 'Bob'}
+        )
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == 'La room n\'existe pas'
     
     def test_join_room_without_name(self, client, sample_room):
         """Test: impossible de rejoindre sans fournir un nom"""
-        pass
+        response = client.post(
+            f'/rooms/{sample_room}/players',
+            json={}
+        )
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == 'Il faut un nom pour rejoindre la room'
 
 
 class TestGetPlayers:
