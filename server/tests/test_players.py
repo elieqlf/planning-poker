@@ -81,11 +81,33 @@ class TestGetPlayers:
     
     def test_get_players_success(self, client, sample_room):
         """Test: récupérer la liste des joueurs d'une room"""
-        pass
+        # Ajouter quelques joueurs à la room
+        rooms[sample_room]['players'].append({
+            'player_id': '1',
+            'player_name': 'Alice'
+        })
+        rooms[sample_room]['players'].append({
+            'player_id': '2',
+            'player_name': 'Bob'
+        })
+        
+        response = client.get(f'/rooms/{sample_room}/players')
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        assert data[0]['player_name'] == 'Alice'
+        assert data[1]['player_name'] == 'Bob'
     
     def test_get_players_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.get('/rooms/NONEXISTENT/players')
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == 'La room n\'existe pas'
 
 
 class TestKickPlayer:
