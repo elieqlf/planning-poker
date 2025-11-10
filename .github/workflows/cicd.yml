@@ -61,3 +61,35 @@ jobs:
       run: |
         echo "Tests terminés avec succès!"
         echo "Les rapports sont disponibles dans les artifacts"
+
+  docs:
+    runs-on: ubuntu-latest
+    needs: test   
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies for documentation
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+        python -m pip install --upgrade pip
+        pip install doxypypy
+
+    - name: Generate Doxygen documentation
+      run: |
+        cd server
+        doxygen Doxyfile || (echo "Doxygen failed"; cat docs/doxygen.log || true)
+
+    - name: Upload documentation
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation-html
+        path: server/docs/html/
