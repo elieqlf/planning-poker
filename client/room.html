@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning Poker - Salle</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="room.css">
+</head>
+<body>
+    <div class="room-container">
+        <!-- Header avec code de la salle -->
+        <header class="room-header">
+            <div class="header-content">
+                <h1 id="roomName">Salle de Planning Poker</h1>
+                <div class="room-code-container">
+                    <span class="room-code-label">Code de la salle :</span>
+                    <div class="room-code-box">
+                        <span id="roomCode" class="room-code">------</span>
+                        <button id="copyCodeBtn" class="btn-copy" title="Copier le code">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <span id="copyFeedback" class="copy-feedback">Copié !</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="room-layout">
+            <!-- Colonne gauche: Liste des tâches -->
+            <aside class="tasks-sidebar">
+                <div class="sidebar-header">
+                    <h2>User Stories</h2>
+                    <button id="addTaskBtn" class="btn-add-task" title="Ajouter une tâche">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Nouvelle tâche
+                    </button>
+                </div>
+                
+                <!-- Formulaire d'ajout de tâche (caché par défaut) -->
+                <div id="addTaskForm" class="add-task-form hidden">
+                    <input 
+                        type="text" 
+                        id="taskTitle" 
+                        placeholder="Titre de la tâche" 
+                        maxlength="200"
+                    >
+                    <div class="form-actions">
+                        <button id="submitTaskBtn" class="btn-submit">Ajouter</button>
+                        <button id="cancelTaskBtn" class="btn-cancel">Annuler</button>
+                    </div>
+                </div>
+
+                <!-- Liste des tâches -->
+                <div id="tasksList" class="tasks-list">
+                    <!-- Les tâches seront ajoutées dynamiquement ici -->
+                </div>
+            </aside>
+
+            <!-- Zone principale: Voting -->
+            <main class="voting-area">
+                <div id="noTaskSelected" class="no-task-message">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <p>Sélectionnez une tâche pour commencer le vote</p>
+                </div>
+
+                <div id="votingInterface" class="voting-interface hidden">
+                    <div class="current-task">
+                        <h2 id="currentTaskTitle">Tâche en cours</h2>
+                        <span id="currentTaskStatus" class="task-status">En cours</span>
+                    </div>
+
+                    <!-- Zone des cartes de vote -->
+                    <div class="voting-cards">
+                        <h3>Choisissez votre estimation</h3>
+                        <div class="cards-container" id="cardsContainer">
+                            <!-- Les cartes seront générées dynamiquement -->
+                        </div>
+                    </div>
+
+                    <!-- Zone des votes des participants -->
+                    <div class="participants-votes">
+                        <h3>Votes des participants</h3>
+                        <div id="participantsList" class="participants-list">
+                            <!-- Les votes seront affichés ici -->
+                        </div>
+                    </div>
+
+                    <!-- Actions pour le créateur -->
+                    <div id="creatorActions" class="creator-actions">
+                        <button id="revealVotesBtn" class="btn-action btn-reveal">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            Révéler les votes
+                        </button>
+                        <button id="finalizeVoteBtn" class="btn-action btn-finalize hidden">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            Finaliser la tâche
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="room.js"></script>
+</body>
+</html>

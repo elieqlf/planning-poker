@@ -10,7 +10,13 @@ document.getElementById('createForm').addEventListener('submit', function(e) {
     
     if (roomName) {
         console.log('Création de la salle :', roomName);
-        alert(`Salle "${roomName}" créée ! (Backend non connecté pour le moment)`);
+        
+        // Pour la démo, générer un code de salle
+        const roomCode = generateRoomCode();
+        localStorage.setItem('currentRoom', roomCode);
+        
+        // Rediriger vers la page de la salle
+        window.location.href = `room.html?room=${roomCode}`;
         
         // Plus tard, appel au backend :
         // fetch('http://127.0.0.1:5000/rooms', {
@@ -18,6 +24,11 @@ document.getElementById('createForm').addEventListener('submit', function(e) {
         //     headers: { 'Content-Type': 'application/json' },
         //     body: JSON.stringify({ name: roomName })
         // })
+        // .then(response => response.json())
+        // .then(data => {
+        //     localStorage.setItem('currentRoom', data.room_id);
+        //     window.location.href = `room.html?room=${data.room_id}`;
+        // });
     }
 });
 
@@ -29,11 +40,18 @@ document.getElementById('joinForm').addEventListener('submit', function(e) {
     
     if (roomCode) {
         console.log('Rejoindre la salle avec le code :', roomCode);
-        alert(`Tentative de rejoindre la salle ${roomCode} ! (Backend non connecté pour le moment)`);
+        localStorage.setItem('currentRoom', roomCode);
+        
+        // Rediriger vers la page de la salle
+        window.location.href = `room.html?room=${roomCode}`;
         
         // Plus tard, appel au backend :
         // fetch(`http://127.0.0.1:5000/rooms/${roomCode}`)
-        // puis fetch(`http://127.0.0.1:5000/rooms/${roomCode}/players`, ...)
+        // .then(response => response.json())
+        // .then(data => {
+        //     localStorage.setItem('currentRoom', roomCode);
+        //     window.location.href = `room.html?room=${roomCode}`;
+        // });
     }
 });
 
@@ -41,3 +59,13 @@ document.getElementById('joinForm').addEventListener('submit', function(e) {
 document.getElementById('roomCode').addEventListener('input', function(e) {
     e.target.value = e.target.value.toUpperCase();
 });
+
+// Fonction pour générer un code de salle (6 caractères)
+function generateRoomCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
