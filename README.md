@@ -23,7 +23,7 @@ python3 -m venv .venv
 ### 2. Activer l’environnement virtuel
 
 ```bash
-.venv\Scripts\Activate.ps1
+source .venv/bin/activate
 ```
 
 ---
@@ -31,7 +31,7 @@ python3 -m venv .venv
 ## Installation des dépendances
 
 ```bash
-pip3 install -r server/requirements.txt
+pip install -r server/requirements.txt
 ```
 
 ---
