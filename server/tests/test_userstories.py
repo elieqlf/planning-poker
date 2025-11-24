@@ -61,15 +61,38 @@ class TestAddUserstory:
     
     def test_add_userstory_success(self, client, sample_room):
         """Test: ajouter une user story à une room"""
-        pass
+        response = client.post(f'/rooms/{sample_room}/userstories', 
+                              json={'title': 'Nouvelle User Story'})
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['title'] == 'Nouvelle User Story'
+        assert data['status'] == 'pending'
+        assert data['votes'] == {}
+        assert data['revealed'] == False
+        assert data['final_vote'] is None
+        assert 'id' in data
     
     def test_add_userstory_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.post('/rooms/NOEXIST/userstories', 
+                              json={'title': 'Test Story'})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La room n'existe pas"
     
     def test_userstory_initial_status(self, client, sample_room):
         """Test: vérifier que la user story est créée avec le statut 'pending'"""
-        pass
+        response = client.post(f'/rooms/{sample_room}/userstories', 
+                              json={'title': 'Story Test'})
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['status'] == 'pending'
+        assert data['revealed'] == False
+        assert data['votes'] == {}
 
 
 class TestAddVote:
@@ -77,19 +100,52 @@ class TestAddVote:
     
     def test_add_vote_success(self, client, sample_room_with_story):
         """Test: ajouter un vote à une user story"""
-        pass
+        room_id, story_id = sample_room_with_story
+        
+        response = client.post(f'/rooms/{room_id}/userstories/{story_id}/vote',
+                              json={'player_id': 'player1', 'vote': 5})
+        
+        assert response.status_code == 201
+        assert response.get_json() == 5
+        
+        # Vérifier que le vote est bien enregistré
+        assert rooms[room_id]['stories'][story_id]['votes']['player1'] == 5
     
     def test_add_vote_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.post('/rooms/NOEXIST/userstories/1/vote',
+                              json={'player_id': 'player1', 'vote': 5})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La room n'existe pas"
     
     def test_add_vote_nonexistent_userstory(self, client, sample_room):
         """Test: erreur si la user story n'existe pas"""
-        pass
+        response = client.post(f'/rooms/{sample_room}/userstories/999/vote',
+                              json={'player_id': 'player1', 'vote': 5})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La userstory n'existe pas"
     
     def test_update_existing_vote(self, client, sample_room_with_story):
         """Test: mettre à jour un vote existant"""
-        pass
+        room_id, story_id = sample_room_with_story
+        
+        # Ajouter un premier vote
+        client.post(f'/rooms/{room_id}/userstories/{story_id}/vote',
+                   json={'player_id': 'player1', 'vote': 3})
+        
+        # Mettre à jour le vote
+        response = client.post(f'/rooms/{room_id}/userstories/{story_id}/vote',
+                              json={'player_id': 'player1', 'vote': 8})
+        
+        assert response.status_code == 201
+        assert response.get_json() == 8
+        assert rooms[room_id]['stories'][story_id]['votes']['player1'] == 8
 
 
 class TestGetUserstories:
@@ -97,40 +153,101 @@ class TestGetUserstories:
     
     def test_get_userstories_success(self, client, sample_room):
         """Test: récupérer toutes les user stories d'une room"""
-        pass
+        # Ajouter des user stories
+        client.post(f'/rooms/{sample_room}/userstories', 
+                   json={'title': 'Story 1'})
+        client.post(f'/rooms/{sample_room}/userstories', 
+                   json={'title': 'Story 2'})
+        
+        response = client.get(f'/rooms/{sample_room}/userstories')
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data) == 2
+        assert '1' in data
+        assert '2' in data
+        assert data['1']['title'] == 'Story 1'
+        assert data['2']['title'] == 'Story 2'
     
     def test_get_userstories_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.get('/rooms/NOEXIST/userstories')
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La room n'existe pas"
 
 
 class TestRevealVotes:
-    """Tests pour l'endpoint POST /rooms/<room_id>/userstories/<userstory_id>/reveal"""
+    """Tests pour l'endpoint POST /rooms/<room_id>/userstories/<userstory_id> (avec revealed)"""
     
     def test_reveal_votes_success(self, client, sample_room_with_story):
         """Test: révéler les votes d'une user story"""
-        pass
+        room_id, story_id = sample_room_with_story
+        
+        response = client.post(f'/rooms/{room_id}/userstories/{story_id}',
+                              json={'revealed': True})
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['revealed'] == True
+        assert rooms[room_id]['stories'][story_id]['revealed'] == True
     
     def test_reveal_votes_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.post('/rooms/NOEXIST/userstories/1',
+                              json={'revealed': True})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La room n'existe pas"
     
     def test_reveal_votes_nonexistent_userstory(self, client, sample_room):
         """Test: erreur si la user story n'existe pas"""
-        pass
+        response = client.post(f'/rooms/{sample_room}/userstories/999',
+                              json={'revealed': True})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La userstory n'existe pas"
 
 
 class TestFinalizeVote:
-    """Tests pour l'endpoint POST /rooms/<room_id>/userstories/<userstory_id>/finalize"""
+    """Tests pour l'endpoint POST /rooms/<room_id>/userstories/<userstory_id> (avec final_vote)"""
     
     def test_finalize_vote_success(self, client, sample_room_with_story):
         """Test: finaliser le vote d'une user story"""
-        pass
+        room_id, story_id = sample_room_with_story
+        
+        response = client.post(f'/rooms/{room_id}/userstories/{story_id}',
+                              json={'final_vote': 8, 'status': 'completed'})
+        
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['final_vote'] == 8
+        assert data['status'] == 'completed'
+        assert rooms[room_id]['stories'][story_id]['final_vote'] == 8
+        assert rooms[room_id]['stories'][story_id]['status'] == 'completed'
     
     def test_finalize_vote_nonexistent_room(self, client):
         """Test: erreur si la room n'existe pas"""
-        pass
+        response = client.post('/rooms/NOEXIST/userstories/1',
+                              json={'final_vote': 5})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La room n'existe pas"
     
     def test_finalize_vote_nonexistent_userstory(self, client, sample_room):
         """Test: erreur si la user story n'existe pas"""
-        pass
+        response = client.post(f'/rooms/{sample_room}/userstories/999',
+                              json={'final_vote': 5})
+        
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+        assert data['error'] == "La userstory n'existe pas"
