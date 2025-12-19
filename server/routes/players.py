@@ -4,12 +4,14 @@ import os
 from dotenv import load_dotenv
 from . import players_bp
 from utils.storage import rooms, players
+from utils.auth import token_required
 
 load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 @players_bp.route('/rooms/<room_id>/players', methods=['POST'])
-def join_room(room_id):
+@token_required
+def join_room(room_id, current_user_id):
     # Si la room n'existe pas, on return une erreur
     if room_id not in rooms:
         return jsonify({
@@ -25,7 +27,14 @@ def join_room(room_id):
         }), 404
 
     player_name = data.get('name')
-    player_id = str(len(rooms[room_id]['players']) + 1)
+    player_id = str(current_user_id)  # Utilise l'ID du token
+
+    # Vérifie si le joueur n'est pas déjà dans la room
+    for player in rooms[room_id]['players']:
+        if player['player_id'] == player_id:
+            return jsonify({
+                'error': 'Vous êtes déjà dans cette room'
+            }), 400
 
     # Ajoute le joueur a la room
     rooms[room_id]['players'].append({
@@ -38,7 +47,8 @@ def join_room(room_id):
     }), 200 # Ok
 
 @players_bp.route('/rooms/<room_id>/players', methods=['GET'])
-def get_players(room_id):
+@token_required
+def get_players(room_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
@@ -47,7 +57,8 @@ def get_players(room_id):
     return jsonify(rooms[room_id]['players'])
 
 @players_bp.route('/rooms/<room_id>/players/<player_id>', methods=['DELETE'])
-def kick_player(room_id, player_id):
+@token_required
+def kick_player(room_id, player_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
@@ -94,10 +105,6 @@ def create_player():
     return jsonify({
         'token': token
     }), 201
-
-def valid_token(token):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
         return payload
     except jwt.ExpiredSignatureError:
         return 'Token Expired'

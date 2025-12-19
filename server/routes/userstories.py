@@ -1,9 +1,11 @@
 from flask import request, jsonify
 from . import userstories_bp
 from utils.storage import rooms
+from utils.auth import token_required
 
 @userstories_bp.route('/rooms/<room_id>/userstories', methods=['POST'])
-def add_userstory(room_id):
+@token_required
+def add_userstory(room_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
@@ -25,7 +27,8 @@ def add_userstory(room_id):
     return jsonify(rooms[room_id]['stories'][id])
 
 @userstories_bp.route('/rooms/<room_id>/userstories/<userstory_id>/vote', methods=['POST'])
-def add_vote(room_id, userstory_id):
+@token_required
+def add_vote(room_id, userstory_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
@@ -37,7 +40,8 @@ def add_vote(room_id, userstory_id):
         }), 404
     
     data = request.get_json()
-    player_id = data.get("player_id")
+    # Utilise l'ID du token si player_id n'est pas fourni
+    player_id = data.get("player_id", str(current_user_id))
     vote = data.get("vote")
     
     rooms[room_id]['stories'][userstory_id]['votes'][player_id] = vote
@@ -45,7 +49,8 @@ def add_vote(room_id, userstory_id):
     return jsonify(rooms[room_id]['stories'][userstory_id]['votes'][player_id]), 201
     
 @userstories_bp.route('/rooms/<room_id>/userstories', methods=['GET'])
-def get_userstories(room_id):
+@token_required
+def get_userstories(room_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
@@ -54,7 +59,8 @@ def get_userstories(room_id):
     return jsonify(rooms[room_id]['stories']), 200
 
 @userstories_bp.route('/rooms/<room_id>/userstories/<userstory_id>', methods=['GET'])
-def get_userstory(room_id, userstory_id):
+@token_required
+def get_userstory(room_id, userstory_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
@@ -68,7 +74,8 @@ def get_userstory(room_id, userstory_id):
     return jsonify(rooms[room_id]['stories'][userstory_id]), 200
 
 @userstories_bp.route('/rooms/<room_id>/userstories/<userstory_id>', methods=['POST'])
-def update_userstory(room_id, userstory_id):
+@token_required
+def update_userstory(room_id, userstory_id, current_user_id):
     if room_id not in rooms:
         return jsonify({
             'error': 'La room n\'existe pas'
