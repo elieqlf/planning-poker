@@ -33,7 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     currentPlayer = {
-        name: playerName
+        name: playerName,
+        id: null  // Sera défini après avoir rejoint la room
     };
 
     // Charger la salle
@@ -64,6 +65,12 @@ async function loadRoom(roomId) {
 
         currentRoom = await response.json();
         currentRoom.id = roomId;
+
+        // Trouver l'ID du joueur actuel dans la liste des joueurs
+        const myPlayer = currentRoom.players?.find(p => p.player_name === currentPlayer.name);
+        if (myPlayer) {
+            currentPlayer.id = myPlayer.player_id;
+        }
 
         // Déterminer si on est le créateur (premier joueur)
         isCreator = currentRoom.players && currentRoom.players.length > 0 &&
@@ -96,6 +103,16 @@ async function loadTasks() {
                 'Authorization': `Bearer ${authToken}`
             }
         });
+
+        if (response.status === 404) {
+            // La room n'existe plus, rediriger
+            console.log('Room introuvable, redirection...');
+            localStorage.removeItem('currentRoom');
+            stopPolling();
+            alert('Cette salle n\'existe plus. Vous allez être redirigé.');
+            window.location.href = 'room-choice.html';
+            return;
+        }
 
         if (response.ok) {
             tasks = await response.json();
@@ -244,7 +261,9 @@ async function voteForCard(value) {
         if (!selectedTask.votes) {
             selectedTask.votes = {};
         }
-        selectedTask.votes[currentPlayer.name] = value;
+        if (currentPlayer.id) {
+            selectedTask.votes[currentPlayer.id] = value;
+        }
 
         // Mettre à jour l'affichage
         updateCardsState();
@@ -259,7 +278,7 @@ async function voteForCard(value) {
 // Mettre à jour l'état des cartes
 function updateCardsState() {
     const cards = document.querySelectorAll('.poker-card');
-    const myVote = selectedTask.votes?.[currentPlayer.name];
+    const myVote = currentPlayer.id ? selectedTask.votes?.[currentPlayer.id] : null;
 
     cards.forEach(card => {
         const value = card.dataset.value;
@@ -269,11 +288,10 @@ function updateCardsState() {
             card.classList.add('selected');
         }
 
-        if (selectedTask.status === 'completed' || selectedTask.revealed) {
-            // Désactiver les cartes si la tâche est terminée ou révélée
-            if (!myVote || myVote !== value) {
-                card.classList.add('disabled');
-            }
+        // Désactiver les cartes uniquement si la tâche est terminée
+        // Permettre le revote tant que la tâche n'est pas finalisée
+        if (selectedTask.status === 'completed') {
+            card.classList.add('disabled');
         }
     });
 }
@@ -292,8 +310,13 @@ function renderParticipantsVotes() {
 
     // Afficher tous les votes
     Object.entries(votes).forEach(([playerId, vote]) => {
-        const playerName = playerId === currentPlayer.name ? currentPlayer.name + ' (Vous)' : playerId;
-        const card = createParticipantCard(playerName, vote, selectedTask.revealed);
+        // Trouver le nom du joueur dans la liste des joueurs de la room
+        const player = currentRoom.players?.find(p => p.player_id === playerId);
+        const playerName = player ? player.player_name : `Joueur ${playerId}`;
+        const isMe = currentPlayer.id && playerId === currentPlayer.id;
+        const displayName = isMe ? playerName + ' (Vous)' : playerName;
+
+        const card = createParticipantCard(displayName, vote, selectedTask.revealed);
         container.appendChild(card);
     });
 }// Créer une carte de participant
@@ -315,18 +338,39 @@ function createParticipantCard(name, vote, revealed) {
 function updateCreatorButtons() {
     const revealBtn = document.getElementById('revealVotesBtn');
     const finalizeBtn = document.getElementById('finalizeVoteBtn');
+    const revoteBtn = document.getElementById('revoteBtn');
+    const differentMessage = document.getElementById('votesDifferentMessage');
 
     if (selectedTask.revealed) {
         revealBtn.classList.add('hidden');
-        finalizeBtn.classList.remove('hidden');
+
+        // Vérifier si tous les votes sont identiques
+        const votes = Object.values(selectedTask.votes || {});
+        const allSame = votes.length > 0 && votes.every(vote => vote === votes[0]);
+
+        if (allSame) {
+            // Tous les votes sont identiques, on peut finaliser
+            finalizeBtn.classList.remove('hidden');
+            revoteBtn.classList.add('hidden');
+            differentMessage.classList.add('hidden');
+        } else {
+            // Les votes sont différents, il faut revoter
+            finalizeBtn.classList.add('hidden');
+            revoteBtn.classList.remove('hidden');
+            differentMessage.classList.remove('hidden');
+        }
     } else {
         revealBtn.classList.remove('hidden');
         finalizeBtn.classList.add('hidden');
+        revoteBtn.classList.add('hidden');
+        differentMessage.classList.add('hidden');
     }
 
     if (selectedTask.status === 'completed') {
         revealBtn.classList.add('hidden');
         finalizeBtn.classList.add('hidden');
+        revoteBtn.classList.add('hidden');
+        differentMessage.classList.add('hidden');
     }
 }
 
@@ -359,6 +403,44 @@ async function revealVotes() {
     }
 }
 
+// Relancer le vote
+async function revote() {
+    if (!selectedTask || !isCreator) return;
+
+    const confirmed = confirm('Relancer le vote ? Tous les votes actuels seront effacés.');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                revealed: false,
+                votes: {}
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Erreur lors du relancement du vote');
+        }
+
+        // Réinitialiser localement
+        selectedTask.revealed = false;
+        selectedTask.votes = {};
+
+        renderParticipantsVotes();
+        updateCreatorButtons();
+        updateCardsState();
+
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Impossible de relancer le vote');
+    }
+}
+
 // Finaliser le vote
 async function finalizeVote() {
     if (!selectedTask || !isCreator) return;
@@ -370,15 +452,14 @@ async function finalizeVote() {
         return;
     }
 
-    // Pour simplifier, prendre le vote le plus commun
-    const voteCounts = {};
-    votes.forEach(vote => {
-        voteCounts[vote] = (voteCounts[vote] || 0) + 1;
-    });
+    // Vérifier que tous les votes sont identiques
+    const allSame = votes.every(vote => vote === votes[0]);
+    if (!allSame) {
+        alert('Les votes ne sont pas unanimes. Veuillez relancer le vote.');
+        return;
+    }
 
-    const finalVote = Object.keys(voteCounts).reduce((a, b) =>
-        voteCounts[a] > voteCounts[b] ? a : b
-    );
+    const finalVote = votes[0];
 
     // Demander confirmation
     const confirmed = confirm(`Finaliser cette tâche avec le vote: ${finalVote} ?`);
@@ -523,4 +604,5 @@ function initializeEvents() {
     // Actions du créateur
     document.getElementById('revealVotesBtn').addEventListener('click', revealVotes);
     document.getElementById('finalizeVoteBtn').addEventListener('click', finalizeVote);
+    document.getElementById('revoteBtn').addEventListener('click', revote);
 }

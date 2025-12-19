@@ -96,6 +96,9 @@ def update_userstory(room_id, userstory_id, current_user_id):
         rooms[room_id]['stories'][userstory_id]['status'] = data.get('status')
     if 'final_vote' in data:
         rooms[room_id]['stories'][userstory_id]['final_vote'] = data.get('final_vote')
+    if 'votes' in data:
+        # Permet de réinitialiser les votes pour un revote
+        rooms[room_id]['stories'][userstory_id]['votes'] = data.get('votes')
 
     return jsonify(rooms[room_id]['stories'][userstory_id]), 200
 
