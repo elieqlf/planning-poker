@@ -105,8 +105,3 @@ def create_player():
     return jsonify({
         'token': token
     }), 201
-        return payload
-    except jwt.ExpiredSignatureError:
-        return 'Token Expired'
-    except jwt.InvalidTokenError:
-        return 'Invalid Token'

@@ -8,15 +8,24 @@ let currentPlayer = null;
 let selectedTask = null;
 let isCreator = false;
 let tasks = {};
+let authToken = null;
+let pollingInterval = null;
 
 // Initialisation
 document.addEventListener('DOMContentLoaded', () => {
-    // Récupérer les informations de la room depuis l'URL ou localStorage
+    // Récupérer le token
+    authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+        alert('Vous devez vous connecter d\'abord');
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // Récupérer les informations de la room depuis l'URL
     const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('room') || localStorage.getItem('currentRoom');
-    const playerId = localStorage.getItem('playerId');
-    const playerName = localStorage.getItem('playerName');
-    
+    const roomId = urlParams.get('room');
+    const playerName = localStorage.getItem('playerName') || 'Joueur';
+
     if (!roomId) {
         alert('Aucune salle spécifiée');
         window.location.href = 'room-choice.html';
@@ -24,14 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     currentPlayer = {
-        id: playerId || generatePlayerId(),
-        name: playerName || 'Joueur'
+        name: playerName
     };
-
-    // Sauvegarder l'ID du joueur
-    if (!playerId) {
-        localStorage.setItem('playerId', currentPlayer.id);
-    }
 
     // Charger la salle
     loadRoom(roomId);
@@ -41,45 +44,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Générer les cartes de poker
     generatePokerCards();
-});
 
-// Générer un ID de joueur unique
-function generatePlayerId() {
-    return 'player_' + Math.random().toString(36).substr(2, 9);
-}
+    // Démarrer le polling pour synchroniser les données
+    startPolling(roomId);
+});
 
 // Charger les informations de la salle
 async function loadRoom(roomId) {
     try {
-        // Simuler le chargement (à remplacer par un vrai appel API)
-        currentRoom = {
-            id: roomId,
-            name: 'Ma salle de Planning Poker',
-            creator_id: currentPlayer.id, // Pour la démo, le joueur est le créateur
-            stories: {}
-        };
+        const response = await fetch(`${API_URL}/rooms/${roomId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
 
-        isCreator = currentRoom.creator_id === currentPlayer.id;
+        if (!response.ok) {
+            throw new Error('Salle introuvable');
+        }
+
+        currentRoom = await response.json();
+        currentRoom.id = roomId;
+
+        // Déterminer si on est le créateur (premier joueur)
+        isCreator = currentRoom.players && currentRoom.players.length > 0 &&
+            currentRoom.players[0].player_name === currentPlayer.name;
 
         // Mettre à jour l'interface
         document.getElementById('roomName').textContent = currentRoom.name;
         document.getElementById('roomCode').textContent = roomId;
 
-        // Afficher/masquer le bouton d'ajout de tâche selon le rôle
+        // Afficher/masquer les contrôles selon le rôle
         if (!isCreator) {
-            document.getElementById('addTaskBtn').style.display = 'none';
             document.getElementById('creatorActions').style.display = 'none';
         }
 
         // Charger les tâches
-        loadTasks();
+        await loadTasks();
 
-        /* Code réel pour appeler l'API :
-        const response = await fetch(`${API_URL}/rooms/${roomId}`);
-        if (!response.ok) throw new Error('Salle introuvable');
-        currentRoom = await response.json();
-        // ... reste du code
-        */
     } catch (error) {
         console.error('Erreur lors du chargement de la salle:', error);
         alert('Impossible de charger la salle');
@@ -88,9 +89,27 @@ async function loadRoom(roomId) {
 }
 
 // Charger les tâches
-function loadTasks() {
-    tasks = currentRoom.stories || {};
-    renderTasksList();
+async function loadTasks() {
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            tasks = await response.json();
+            renderTasksList();
+
+            // Si une tâche est sélectionnée, la mettre à jour
+            if (selectedTask && tasks[selectedTask.id]) {
+                selectedTask = tasks[selectedTask.id];
+                showVotingInterface();
+            }
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des tâches:', error);
+    }
 }
 
 // Afficher la liste des tâches
@@ -99,7 +118,7 @@ function renderTasksList() {
     tasksList.innerHTML = '';
 
     const taskIds = Object.keys(tasks);
-    
+
     if (taskIds.length === 0) {
         tasksList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Aucune tâche pour le moment</p>';
         return;
@@ -137,9 +156,26 @@ function createTaskElement(task) {
 }
 
 // Sélectionner une tâche
-function selectTask(task) {
+async function selectTask(task) {
     selectedTask = task;
     renderTasksList();
+
+    // Charger les détails à jour de la tâche
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${task.id}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (response.ok) {
+            selectedTask = await response.json();
+            tasks[selectedTask.id] = selectedTask;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement de la tâche:', error);
+    }
+
     showVotingInterface();
 }
 
@@ -149,7 +185,7 @@ function showVotingInterface() {
     document.getElementById('votingInterface').classList.remove('hidden');
 
     document.getElementById('currentTaskTitle').textContent = selectedTask.title;
-    
+
     const statusElement = document.getElementById('currentTaskStatus');
     statusElement.textContent = selectedTask.status === 'completed' ? 'Terminée' : 'En cours';
     statusElement.className = 'task-status ' + (selectedTask.status === 'completed' ? 'completed' : 'pending');
@@ -184,36 +220,46 @@ function generatePokerCards() {
 }
 
 // Voter pour une carte
-function voteForCard(value) {
+async function voteForCard(value) {
     if (!selectedTask) return;
     if (selectedTask.status === 'completed') return;
 
-    // Mettre à jour le vote local
-    if (!selectedTask.votes) {
-        selectedTask.votes = {};
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}/vote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                vote: value
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Erreur lors du vote');
+        }
+
+        // Mettre à jour localement
+        if (!selectedTask.votes) {
+            selectedTask.votes = {};
+        }
+        selectedTask.votes[currentPlayer.name] = value;
+
+        // Mettre à jour l'affichage
+        updateCardsState();
+        renderParticipantsVotes();
+
+    } catch (error) {
+        console.error('Erreur lors du vote:', error);
+        alert('Impossible d\'enregistrer votre vote');
     }
-    selectedTask.votes[currentPlayer.id] = value;
-
-    // Mettre à jour l'affichage
-    updateCardsState();
-    renderParticipantsVotes();
-
-    /* Code réel pour appeler l'API :
-    fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}/vote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player_id: currentPlayer.id,
-            vote: value
-        })
-    });
-    */
 }
 
 // Mettre à jour l'état des cartes
 function updateCardsState() {
     const cards = document.querySelectorAll('.poker-card');
-    const myVote = selectedTask.votes?.[currentPlayer.id];
+    const myVote = selectedTask.votes?.[currentPlayer.name];
 
     cards.forEach(card => {
         const value = card.dataset.value;
@@ -237,9 +283,8 @@ function renderParticipantsVotes() {
     const container = document.getElementById('participantsList');
     container.innerHTML = '';
 
-    // Pour la démo, afficher le vote du joueur actuel
     const votes = selectedTask.votes || {};
-    
+
     if (Object.keys(votes).length === 0) {
         container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Aucun vote pour le moment</p>';
         return;
@@ -247,13 +292,11 @@ function renderParticipantsVotes() {
 
     // Afficher tous les votes
     Object.entries(votes).forEach(([playerId, vote]) => {
-        const playerName = playerId === currentPlayer.id ? currentPlayer.name + ' (Vous)' : 'Joueur ' + playerId.slice(-4);
+        const playerName = playerId === currentPlayer.name ? currentPlayer.name + ' (Vous)' : playerId;
         const card = createParticipantCard(playerName, vote, selectedTask.revealed);
         container.appendChild(card);
     });
-}
-
-// Créer une carte de participant
+}// Créer une carte de participant
 function createParticipantCard(name, vote, revealed) {
     const div = document.createElement('div');
     div.className = 'participant-card';
@@ -288,25 +331,36 @@ function updateCreatorButtons() {
 }
 
 // Révéler les votes
-function revealVotes() {
+async function revealVotes() {
     if (!selectedTask || !isCreator) return;
 
-    selectedTask.revealed = true;
-    renderParticipantsVotes();
-    updateCreatorButtons();
-    updateCardsState();
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ revealed: true })
+        });
 
-    /* Code réel pour appeler l'API :
-    fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ revealed: true })
-    });
-    */
+        if (!response.ok) {
+            throw new Error('Erreur lors de la révélation des votes');
+        }
+
+        selectedTask.revealed = true;
+        renderParticipantsVotes();
+        updateCreatorButtons();
+        updateCardsState();
+
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Impossible de révéler les votes');
+    }
 }
 
 // Finaliser le vote
-function finalizeVote() {
+async function finalizeVote() {
     if (!selectedTask || !isCreator) return;
 
     // Calculer le vote moyen (ou demander au créateur)
@@ -322,7 +376,7 @@ function finalizeVote() {
         voteCounts[vote] = (voteCounts[vote] || 0) + 1;
     });
 
-    const finalVote = Object.keys(voteCounts).reduce((a, b) => 
+    const finalVote = Object.keys(voteCounts).reduce((a, b) =>
         voteCounts[a] > voteCounts[b] ? a : b
     );
 
@@ -330,33 +384,42 @@ function finalizeVote() {
     const confirmed = confirm(`Finaliser cette tâche avec le vote: ${finalVote} ?`);
     if (!confirmed) return;
 
-    selectedTask.final_vote = finalVote;
-    selectedTask.status = 'completed';
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                final_vote: finalVote,
+                status: 'completed'
+            })
+        });
 
-    renderTasksList();
-    showVotingInterface();
+        if (!response.ok) {
+            throw new Error('Erreur lors de la finalisation');
+        }
 
-    /* Code réel pour appeler l'API :
-    fetch(`${API_URL}/rooms/${currentRoom.id}/userstories/${selectedTask.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            final_vote: finalVote,
-            status: 'completed'
-        })
-    });
-    */
-}
+        selectedTask.final_vote = finalVote;
+        selectedTask.status = 'completed';
 
-// Copier le code de la salle
+        renderTasksList();
+        showVotingInterface();
+
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Impossible de finaliser la tâche');
+    }
+}// Copier le code de la salle
 function copyRoomCode() {
     const roomCode = document.getElementById('roomCode').textContent;
-    
+
     navigator.clipboard.writeText(roomCode).then(() => {
         // Afficher le feedback
         const feedback = document.getElementById('copyFeedback');
         feedback.classList.add('show');
-        
+
         setTimeout(() => {
             feedback.classList.remove('show');
         }, 2000);
@@ -367,53 +430,68 @@ function copyRoomCode() {
 }
 
 // Ajouter une nouvelle tâche
-function addTask() {
+async function addTask() {
     const title = document.getElementById('taskTitle').value.trim();
-    
+
     if (!title) {
         alert('Veuillez entrer un titre');
         return;
     }
 
-    // Créer la tâche
-    const taskId = String(Object.keys(tasks).length + 1);
-    const newTask = {
-        id: taskId,
-        title: title,
-        status: 'pending',
-        votes: {},
-        revealed: false,
-        final_vote: null
-    };
+    try {
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ title: title })
+        });
 
-    tasks[taskId] = newTask;
-    currentRoom.stories = tasks;
+        if (!response.ok) {
+            throw new Error('Erreur lors de la création de la tâche');
+        }
 
-    // Réinitialiser le formulaire
-    document.getElementById('taskTitle').value = '';
-    document.getElementById('addTaskForm').classList.add('hidden');
-    document.getElementById('addTaskBtn').style.display = 'flex';
+        const newTask = await response.json();
+        tasks[newTask.id] = newTask;
 
-    // Mettre à jour l'affichage
-    renderTasksList();
+        // Réinitialiser le formulaire
+        document.getElementById('taskTitle').value = '';
+        document.getElementById('addTaskForm').classList.add('hidden');
+        document.getElementById('addTaskBtn').style.display = 'flex';
 
-    // Sélectionner automatiquement la nouvelle tâche
-    selectTask(newTask);
-
-    /* Code réel pour appeler l'API :
-    fetch(`${API_URL}/rooms/${currentRoom.id}/userstories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title })
-    })
-    .then(response => response.json())
-    .then(task => {
-        tasks[task.id] = task;
+        // Mettre à jour l'affichage
         renderTasksList();
-        selectTask(task);
-    });
-    */
+
+        // Sélectionner automatiquement la nouvelle tâche
+        selectTask(newTask);
+
+    } catch (error) {
+        console.error('Erreur:', error);
+        alert('Impossible de créer la tâche');
+    }
 }
+
+// Démarrer le polling pour synchroniser les données
+function startPolling(roomId) {
+    // Polling toutes les 2 secondes
+    pollingInterval = setInterval(async () => {
+        await loadTasks();
+    }, 2000);
+}
+
+// Arrêter le polling (utile lors du nettoyage)
+function stopPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
+// Nettoyer lors de la fermeture de la page
+window.addEventListener('beforeunload', () => {
+    stopPolling();
+});
 
 // Initialiser les événements
 function initializeEvents() {
@@ -428,7 +506,7 @@ function initializeEvents() {
     });
 
     document.getElementById('submitTaskBtn').addEventListener('click', addTask);
-    
+
     document.getElementById('cancelTaskBtn').addEventListener('click', () => {
         document.getElementById('addTaskForm').classList.add('hidden');
         document.getElementById('addTaskBtn').style.display = 'flex';
