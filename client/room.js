@@ -98,13 +98,14 @@ async function loadRoom(roomId) {
 // Charger les tâches
 async function loadTasks() {
     try {
-        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories`, {
+        // Charger d'abord les infos de la room pour avoir la liste à jour des joueurs
+        const roomResponse = await fetch(`${API_URL}/rooms/${currentRoom.id}`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`
             }
         });
 
-        if (response.status === 404) {
+        if (roomResponse.status === 404) {
             // La room n'existe plus, rediriger
             console.log('Room introuvable, redirection...');
             localStorage.removeItem('currentRoom');
@@ -113,6 +114,19 @@ async function loadTasks() {
             window.location.href = 'room-choice.html';
             return;
         }
+
+        if (roomResponse.ok) {
+            const roomData = await roomResponse.json();
+            // Mettre à jour la liste des joueurs
+            currentRoom.players = roomData.players;
+        }
+
+        // Ensuite charger les user stories
+        const response = await fetch(`${API_URL}/rooms/${currentRoom.id}/userstories`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
 
         if (response.ok) {
             tasks = await response.json();
